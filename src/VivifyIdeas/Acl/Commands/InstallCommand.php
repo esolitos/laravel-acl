@@ -3,11 +3,13 @@
 namespace VivifyIdeas\Acl\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Filesystem\Filesystem;
+
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Artisan;
+
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
-
-use Illuminate\Database\Schema\Blueprint;
-use Schema;
 
 /**
  * Custom Artisan command for installing ACL DB structure.
@@ -27,7 +29,27 @@ class InstallCommand extends Command
 	 *
 	 * @var string
 	 */
-	protected $description = 'Create basic ACL table structure.';
+	protected $description = 'Create a migration for the ACL table structure.';
+
+	/**
+	 * The filesystem instance.
+	 *
+	 * @var \Illuminate\Filesystem\Filesystem
+	 */
+	protected $files;
+
+	/**
+	 * Create a new command instance.
+	 *
+	 * @param  \Illuminate\Filesystem\Filesystem  $files
+	 * @return void
+	 */
+	public function __construct(Filesystem $files)
+	{
+		parent::__construct();
+
+		$this->files = $files;
+	}
 
 	/**
 	 * Get the console command arguments.
@@ -37,7 +59,7 @@ class InstallCommand extends Command
 	protected function getArguments()
 	{
 		return array(
-			array('clean', InputArgument::OPTIONAL, 'Clean install. Delete "permissions" and "users_permissions" table.'),
+			array('no-foreign', InputArgument::OPTIONAL, 'Do NOT create a migration for adding foreign keys to the database.'),
 		);
 	}
 
@@ -48,110 +70,42 @@ class InstallCommand extends Command
 	 */
 	public function fire()
 	{
-
-		if ($this->argument('clean')) {
-			$this->createConfig();
-
-			// remove tables if clean attr exist
-			if (Schema::hasTable('acl_permissions')) {
-				Schema::drop('acl_permissions');
-			}
-
-			if (Schema::hasTable('acl_users_permissions')) {
-				Schema::drop('acl_users_permissions');
-			}
-
-			if (Schema::hasTable('acl_groups')) {
-				Schema::drop('acl_groups');
-			}
-
-			if (Schema::hasTable('acl_roles_permissions')) {
-			    Schema::drop('acl_roles_permissions');
-			}
-
-			if (Schema::hasTable('acl_roles')) {
-			    Schema::drop('acl_roles');
-			}
-			if (Schema::hasTable('acl_users_roles')) {
-			    Schema::drop('acl_users_roles');
-			}
-		} elseif (!file_exists(app_path() . '/config/packages/vivify-ideas/acl/config.php')) {
+    if (!file_exists(app_path() . '/config/packages/vivify-ideas/acl/config.php')) {
 			$this->createConfig();
 		}
+    
+    $create_foreign_keys = !( (bool)$this->argument('no-foreign') );
+    
+		$fullPath = $this->createBaseMigration('create_acl_tables');
+		$this->files->put($fullPath, $this->files->get(__DIR__.'/stubs/database.stub'));
+    
+    if ( $create_foreign_keys ) {
+  		$fullPath = $this->createBaseMigration('foreign_keys_add_acl_tables');
+  		$this->files->put($fullPath, $this->files->get(__DIR__.'/stubs/foreignKeys.stub'));
+    }
 
-		if (Schema::hasTable('acl_permissions') &&
-			Schema::hasTable('acl_users_permissions') &&
-			Schema::hasTable('acl_groups') &&
-			Schema::hasTable('acl_roles')){
-			// you already installed ACL
-			$this->error('You already installed ACL.');
-			return;
-		}
+		$this->info('Migration created successfully, registering new classes...');
 
-		if (!Schema::hasTable('acl_permissions')) {
-			Schema::create('acl_permissions', function(Blueprint $table) {
-				$table->string('id')->primary();
-				$table->boolean('allowed');
-				$table->text('route');
-				$table->boolean('resource_id_required');
-				$table->string('name');
-				$table->string('group_id')->nullable();
-			});
-		}
-
-		if (!Schema::hasTable('acl_users_permissions')) {
-			Schema::create('acl_users_permissions', function(Blueprint $table) {
-				$table->increments('id');
-				$table->string('permission_id')->index();
-				$table->integer('user_id')->index();
-				$table->boolean('allowed')->nullable();
-				$table->string('allowed_ids')->nullable();
-				$table->string('excluded_ids')->nullable();
-			});
-		}
-
-		if (!Schema::hasTable('acl_groups')) {
-			Schema::create('acl_groups', function(Blueprint $table) {
-				$table->string('id')->primary();
-				$table->string('name');
-				$table->text('route')->nullable();
-				$table->string('parent_id')->index()->nullable();
-			});
-		}
-
-		if (!Schema::hasTable('acl_roles_permissions')) {
-		    Schema::create('acl_roles_permissions', function(Blueprint $table) {
-		        $table->increments('id');
-		        $table->string('permission_id')->index();
-		        $table->string('role_id')->index();
-		        $table->boolean('allowed')->nullable();
-		        $table->string('allowed_ids')->nullable();
-		        $table->string('excluded_ids')->nullable();
-		    });
-		}
-
-		if (!Schema::hasTable('acl_roles')) {
-		    Schema::create('acl_roles', function(Blueprint $table) {
-		        $table->string('id')->primary();
-		        $table->string('name');
-		        $table->string('parent_id')->index()->nullable();
-		    });
-		}
-
-		if (!Schema::hasTable('acl_users_roles')) {
-		    Schema::create('acl_users_roles', function(Blueprint $table) {
-		        $table->increments('id');
-		        $table->integer('user_id');
-		        $table->string('role_id');
-		    });
-		}
-
-		$this->info('ACL was installed successfully!');
+    Artisan::call('dump-autoload');
+    
+    $this->info('...autoloader updated, remember to run `php artisan migrate` to create the new tables!');
 	}
 
 	private function createConfig()
 	{
 		return $this->call('config:publish', array('--path' => 'vendor/vivify-ideas/acl/src/config', 'package' => 'vivify-ideas/acl'));
+	}
+  
+	/**
+	 * Create a base migration file.
+	 *
+	 * @return string
+	 */
+	protected function createBaseMigration($migrationName)
+	{
+		$path = $this->laravel['path'].'/database/migrations';
+
+		return $this->laravel['migration.creator']->create($migrationName, $path);
 	}
 
 

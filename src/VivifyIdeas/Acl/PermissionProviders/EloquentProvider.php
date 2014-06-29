@@ -2,6 +2,8 @@
 
 namespace VivifyIdeas\Acl\PermissionProviders;
 
+use Illuminate\Support\Facades\DB;
+
 use VivifyIdeas\Acl\Models\UserPermission;
 use VivifyIdeas\Acl\Models\Permission;
 use VivifyIdeas\Acl\Models\Group;
@@ -188,7 +190,9 @@ class EloquentProvider extends \VivifyIdeas\Acl\PermissionsProviderAbstract
      */
     public function deleteAllPermissions()
     {
-        return Permission::truncate();
+        $this->foreignChecks(FALSE);
+        Permission::truncate();
+        $this->foreignChecks(TRUE);
     }
 
     /**
@@ -196,7 +200,9 @@ class EloquentProvider extends \VivifyIdeas\Acl\PermissionsProviderAbstract
      */
     public function deleteAllUsersPermissions()
     {
-        return UserPermission::truncate();
+        $this->foreignChecks(FALSE);
+        UserPermission::truncate();
+        $this->foreignChecks(TRUE);
     }
 
     /**
@@ -247,7 +253,9 @@ class EloquentProvider extends \VivifyIdeas\Acl\PermissionsProviderAbstract
      */
     public function deleteAllGroups()
     {
-        return Group::truncate();
+        $this->foreignChecks(FALSE);
+        Group::truncate();
+        $this->foreignChecks(TRUE);
     }
 
     /**
@@ -255,7 +263,9 @@ class EloquentProvider extends \VivifyIdeas\Acl\PermissionsProviderAbstract
      */
     public function deleteAllRoles()
     {
-        return Role::truncate();
+        $this->foreignChecks(FALSE);
+        Role::truncate();
+        $this->foreignChecks(TRUE);
     }
 
     /**
@@ -292,4 +302,13 @@ class EloquentProvider extends \VivifyIdeas\Acl\PermissionsProviderAbstract
         return UserRole::where('user_id', $userId)->lists('role_id');
     }
 
+    private function foreignChecks($enable = TRUE)
+    {
+      if ( $enable === TRUE ) {
+        DB::statement('SET foreign_key_checks = 1');
+      }
+      else {
+        DB::statement('SET foreign_key_checks = 0');
+      }
+    }
 }

@@ -17,6 +17,19 @@ return array(
 
     /*
     |--------------------------------------------------------------------------
+    | Eloquent: Users Table
+    |--------------------------------------------------------------------------
+    |
+    | Insert here the table containing the users.
+    | It will be used to create foreign keys in the database
+    |
+    | Currently used only by the provider "eloquent".
+    |
+    */
+    'users_table' => 'users',
+
+    /*
+    |--------------------------------------------------------------------------
     | Super users array
     |--------------------------------------------------------------------------
     |

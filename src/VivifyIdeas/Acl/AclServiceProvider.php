@@ -39,10 +39,9 @@ class AclServiceProvider extends ServiceProvider {
 	public function register()
 	{
 		$this->registerAclInstallCommand();
-		$this->registerAclResetCommand();
 		$this->registerAclUpdateCommand();
 
-		$this->commands('acl.install', 'acl.reset', 'acl.update');
+		$this->commands('acl.install', 'acl.update');
 	}
 
 	private function getProviderClass()
@@ -57,17 +56,7 @@ class AclServiceProvider extends ServiceProvider {
 	protected function registerAclInstallCommand()
 	{
 	    $this->app['acl.install'] = $this->app->share(function($app) {
-	        return new Commands\InstallCommand();
-	    });
-	}
-
-	/**
-	 * Register acl:reset command
-	 */
-	protected function registerAclResetCommand()
-	{
-	    $this->app['acl.reset'] = $this->app->share(function($app) {
-	        return new Commands\ResetCommand();
+	        return new Commands\InstallCommand($app['files']);
 	    });
 	}
 
